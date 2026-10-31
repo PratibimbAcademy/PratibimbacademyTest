@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pratibimb Academy - Perfect Paper Creator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --bg: #cbd5e1;
+            --q-font-size: 10.5px;
+            --q-line-height: 1.35;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background-color: var(--bg); padding: 15px; }
+
+        /* Admin Controls */
+        .admin-panel { max-width: 950px; margin: 0 auto 15px auto; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .admin-panel h2 { color: var(--primary); margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; font-size: 18px; }
+        .section-title { font-weight: bold; font-size: 12.5px; background: #f1f5f9; padding: 5px 8px; margin: 10px 0 8px 0; border-left: 4px solid var(--primary); }
+        
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .form-group { margin-bottom: 8px; }
+        .form-group label { display: block; font-weight: bold; font-size: 11px; margin-bottom: 2px; color: #334155; }
+        .form-group input, .form-group textarea { width: 100%; padding: 6px; border: 1px solid #94a3b8; border-radius: 4px; font-size: 11.5px; }
+        .form-group textarea { height: 60px; font-family: monospace; }
+
+        .btn-group { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .btn { padding: 10px 15px; border: none; border-radius: 5px; font-weight: bold; font-size: 13px; cursor: pointer; color: white; flex: 1; text-align: center; }
+        .btn-preview { background: #3b82f6; }
+        .btn-test { background: var(--primary); }
+        .btn-solution { background: #047857; }
+        .btn-print { background: #d97706; }
+
+        /* Strict A4 Document Layout */
+        .paper-wrapper { max-width: 210mm; margin: 0 auto; display: none; background: #fff; }
+        .a4-page { 
+            width: 210mm; 
+            height: 296mm; 
+            padding: 10mm 12mm; 
+            background: #fff; 
+            position: relative; 
+            page-break-after: always; 
+            page-break-inside: avoid;
+            box-sizing: border-box; 
+            overflow: hidden; 
+            margin-bottom: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        /* Watermark */
+        .watermark {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(var(--wm-angle, -30deg));
+            opacity: var(--wm-opacity, 0.12);
+            pointer-events: none;
+            z-index: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: var(--wm-size, 70%);
+            max-height: 75%;
+            text-align: center;
+            overflow: visible;
+        }
+        .watermark-text {
+            color: #000;
+            font-size: 45px;
+            font-weight: 900;
+            line-height: 1.15;
+            overflow-wrap: anywhere;
+        }
+        .watermark-image {
+            display: block;
+            width: 100%;
+            max-height: 75%;
+            object-fit: contain;
+        }
+
+        /* Front Page Elements */
+        .front-header { display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 3px; }
+        .title-box { text-align: center; border: 2px solid #000; border-radius: 12px; padding: 3px 12px; font-size: 18px; font-weight: bold; width: fit-content; margin: 6px auto; }
+        .sub-header { display: flex; justify-content: space-between; font-size: 10.5px; font-weight: bold; margin-bottom: 8px; }
+        .brand-logo { text-align: center; margin: 6px 0; }
+        .brand-logo h1 { font-size: 28px; font-weight: 900; letter-spacing: 1px; color: #1f2937; }
+
+        /* Instructions Layout */
+        .instructions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+        .inst-box { 
+            border: 1.5px solid #000; 
+            border-radius: 6px; 
+            padding: 6px; 
+            font-size: 8.5px; 
+            line-height: 1.25; 
+            max-height: 170mm; 
+            overflow: hidden; 
+        }
+        .inst-box h4 { text-align: center; border-bottom: 1px solid #000; margin-bottom: 4px; padding-bottom: 2px; font-size: 9.5px; }
+        .inst-content ol { padding-left: 12px; }
+        .inst-content li { margin-bottom: 2px; }
+
+        .omr-demo { width: 100%; border-collapse: collapse; text-align: center; margin: 4px 0; font-size: 8px; }
+        .omr-demo th, .omr-demo td { border: 1px solid #000; padding: 1px; }
+
+        .branch-footer { position: absolute; bottom: 12mm; left: 12mm; right: 12mm; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 9px; text-align: center; }
+        .branch-box { background: #f8fafc; border: 1px solid #cbd5e1; padding: 4px; border-radius: 4px; }
+
+        /* NATURAL 2-COLUMN FLOW CONTAINER (MS Word Newspaper Style) */
+        .questions-column-container {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            column-gap: 12mm;
+            width: 100%;
+            height: 265mm;
+            font-size: var(--q-font-size);
+            line-height: var(--q-line-height);
+            position: relative;
+            z-index: 1;
+            box-sizing: border-box;
+        }
+        .question-col { height: 265mm; min-width: 0; overflow: hidden; }
+        .question-col:first-child { border-right: 1px solid #e2e8f0; padding-right: 6mm; }
+        .question-col:last-child { padding-left: 0; }
+        .q-block {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 10px;
+            padding-bottom: 2px;
+            width: 100%;
+        }
+        .q-title { font-weight: bold; margin-bottom: 3px; word-wrap: break-word; white-space: normal; }
+        .q-en { font-weight: 600; color: #26364b; margin-top: 2px; }
+        .q-opts { list-style: none; padding-left: 2px; }
+        .q-opts li { margin-bottom: 1px; word-wrap: break-word; }
+        .sol-box { background: #f0fdf4; border-left: 3px solid #047857; padding: 4px; margin-top: 3px; font-size: 9.5px; }
+        .page-num { position: absolute; bottom: 4mm; left: 0; width: 100%; text-align: center; font-size: 9.5px; font-weight: bold; border-top: 1px solid #ccc; padding-top: 2px; }
+
+        /* Direct Print Support */
+        @media print {
+            body { background: white; padding: 0; }
+            .admin-panel { display: none !important; }
+            .paper-wrapper { display: block !important; width: 100%; box-shadow: none; }
+            .a4-page { page-break-after: always; height: 296mm; position: relative; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="admin-panel">
+    <h2>⚙️ Pratibimb Academy - Perfect Paper Creator</h2>
+    
+    <div class="section-title">📌 Page 1 Controls</div>
+    <div class="grid-3">
+        <div class="form-group">
+            <label>Exam Title:</label>
+            <input type="text" id="inp-title" value="PSI : 2025">
+        </div>
+        <div class="form-group">
+            <label>Paper ID:</label>
+            <input type="text" id="inp-paper-id" value="PAPER - I | ID: H2">
+        </div>
+        <div class="form-group">
+            <label>Subject Title:</label>
+            <input type="text" id="inp-subject" value="Hindi [समास]">
+        </div>
+    </div>
+    <div class="grid-3">
+        <div class="form-group">
+            <label>Total Questions:</label>
+            <input type="text" id="inp-total-q" value="100">
+        </div>
+        <div class="form-group">
+            <label>Time Duration:</label>
+            <input type="text" id="inp-time" value="2.00 घण्टे">
+        </div>
+        <div class="form-group">
+            <label>Maximum Marks:</label>
+            <input type="text" id="inp-marks" value="200">
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="form-group">
+            <label>Hindi Instructions Text:</label>
+            <textarea id="inp-inst-hi">1. सभी प्रश्नों के उत्तर दीजिए। सभी प्रश्नों के अंक समान हैं।
+2. प्रत्येक प्रश्न के 5 विकल्प दिए गए हैं [1, 2, 3, 4, 5]।
+3. सही उत्तर नीले बॉल पॉइंट पेन से गहरा करें।
+4. अनुत्तरित प्रश्न के लिए विकल्प [5] को काला करें।
+5. गलत उत्तर के लिए 1/3 भाग काटा जाएगा।</textarea>
+        </div>
+        <div class="form-group">
+            <label>English Instructions Text:</label>
+            <textarea id="inp-inst-en">1. Answer all questions. All questions carry equal marks.
+2. Each question has 5 options [1, 2, 3, 4, 5].
+3. Darken correct circle using blue ball point pen.
+4. For unanswered questions, darken option [5].
+5. 1/3 mark will be deducted for wrong answers.</textarea>
+        </div>
+    </div>
+
+    <div class="section-title">📝 Question Controls & Alignment</div>
+    <div class="grid-3">
+        <div class="form-group">
+            <label>Question Language / प्रश्नों की भाषा:</label>
+            <select id="inp-language" onchange="renderPaper('test')" style="width:100%;padding:7px;border:1px solid #94a3b8;border-radius:4px;font-size:12px;">
+                <option value="bi">Bilingual (Hindi + English)</option>
+                <option value="hi">केवल हिन्दी (Hindi)</option>
+                <option value="en">English Only</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Font Size (px):</label>
+            <input type="number" id="inp-q-size" value="10" step="0.5" min="8" max="14" onchange="applyStyles()">
+        </div>
+        <div class="form-group">
+            <label>Watermark Text:</label>
+            <input type="text" id="inp-wm-text" value="Pratibimb Academy" oninput="updateWatermarks()">
+        </div>
+    </div>
+    <div class="section-title">🖼️ Watermark Settings</div>
+    <div class="grid-3">
+        <div class="form-group">
+            <label>Gallery से Watermark Photo Upload:</label>
+            <input type="file" id="inp-wm-image" accept="image/*" onchange="loadWatermarkImage(event)">
+            <button type="button" class="btn btn-preview" style="margin-top:5px;padding:7px;" onclick="removeWatermarkImage()">Remove Photo / केवल Text</button>
+        </div>
+        <div class="form-group">
+            <label>Watermark Opacity: <span id="wm-opacity-value">12%</span></label>
+            <input type="range" id="inp-wm-opacity" min="1" max="100" value="12" oninput="updateWatermarks()">
+        </div>
+        <div class="form-group">
+            <label>Watermark Size: <span id="wm-size-value">70%</span></label>
+            <input type="range" id="inp-wm-size" min="10" max="100" value="70" oninput="updateWatermarks()">
+        </div>
+        <div class="form-group">
+            <label>Watermark Angle: <span id="wm-angle-value">-30°</span></label>
+            <input type="range" id="inp-wm-angle" min="-180" max="180" value="-30" oninput="updateWatermarks()">
+        </div>
+    </div>
+    </div>
+
+    <div class="form-group">
+        <label>Questions JSON Input:</label>
+        <textarea id="inp-json" style="height: 90px;">[
+  {
+    "question": "कथन (A): किसी चालक तार की लंबाई को खींचकर दोगुना कर दिया जाए, तो उसका प्रतिरोध चार गुना हो जाता है।\nकारण (R): प्रतिरोधकता चालक के पदार्थ की प्रकृति पर निर्भर करती है।\nसही कूट का चयन कीजिए:",
+    "option": ["(A) और (R) दोनों सही हैं", "(A) और (R) दोनों गलत हैं", "(A) सही है, R गलत है", "(A) गलत है, R सही है"],
+    "answer": "A",
+    "solution": "प्रतिरोध लंबाई के वर्ग के समानुपाती होता है।"
+  },
+  {
+    "question": "एमीटर को परिपथ में हमेशा श्रेणीक्रम में जोड़ा जाता है क्योंकि इसका प्रतिरोध बहुत कम होना चाहिए।",
+    "option": ["सत्य", "असत्य", "आंशिक सत्य", "इनमें से कोई नहीं"],
+    "answer": "A",
+    "solution": "एमीटर का प्रतिरोध आदर्श स्थिति में शून्य होता है।"
+  }
+]</textarea>
+    </div>
+    <div style="font-size:11px;color:#475569;margin-top:-3px;line-height:1.5;">
+        भाषा बदलने के लिए JSON में <b>question_hi / question_en</b>, <b>option_hi / option_en</b> और <b>solution_hi / solution_en</b> दें। पुराने <b>question / option / solution</b> फॉर्मेट का भी सपोर्ट रहेगा।
+        <br>नोट: यह चयन JSON में पहले से मौजूद भाषा दिखाता है; एक भाषा से दूसरी भाषा का स्वतः अनुवाद नहीं करता।
+    </div>
+
+    <div class="btn-group">
+        <button class="btn btn-preview" onclick="renderPaper('test')">👁️ Live Preview</button>
+        <button class="btn btn-test" onclick="downloadPDF('test')">📄 Save Test PDF</button>
+        <button class="btn btn-solution" onclick="downloadPDF('solution')">📑 Save Solution PDF</button>
+        <button class="btn btn-print" onclick="triggerPrint()">🖨️ Direct Print / Save PDF</button>
+    </div>
+</div>
+
+<!-- PREVIEW AREA -->
+<div class="paper-wrapper" id="paper">
+    <!-- COVER PAGE -->
+    <div class="a4-page">
+        <div class="watermark" id="disp-wm-1"><span class="watermark-text">Pratibimb Academy</span></div>
+        
+        <div class="front-header">
+            <div>पुस्तिका में पृष्ठों की संख्या - <span id="lbl-pages">2</span></div>
+            <div>पुस्तिका में प्रश्नों की संख्या - <span id="lbl-total-q">100</span></div>
+        </div>
+
+        <div style="text-align:center;">
+            <div class="title-box" id="lbl-title">PSI : 2025</div>
+            <div style="font-weight: bold; font-size: 11px; margin-bottom: 4px;" id="lbl-paper-id">PAPER - I</div>
+        </div>
+
+        <div class="sub-header">
+            <div>SUBJECT : <span id="lbl-subject">Hindi [समास]</span><br>समय : <span id="lbl-time">2.00 घण्टे</span></div>
+            <div style="text-align:right;">अधिकतम अंक : <span id="lbl-marks">200</span></div>
+        </div>
+
+        <div class="brand-logo">
+            <h1>PRATIBIMB ACADEMY</h1>
+        </div>
+
+        <div class="instructions-grid">
+            <div class="inst-box">
+                <h4>परीक्षार्थियों के लिए निर्देश</h4>
+                <div class="inst-content" id="lbl-inst-hi"></div>
+                <table class="omr-demo">
+                    <tr><th>प्रश्न</th><th>उत्तर</th><th>अनुत्तरित (5)</th></tr>
+                    <tr><td>1.</td><td>① ② ③ ④</td><td>⑤</td></tr>
+                </table>
+            </div>
+            <div class="inst-box">
+                <h4>INSTRUCTIONS FOR CANDIDATES</h4>
+                <div class="inst-content" id="lbl-inst-en"></div>
+                <table class="omr-demo">
+                    <tr><th>Q. No.</th><th>Answered</th><th>Not attempted</th></tr>
+                    <tr><td>1.</td><td>① ② ③ ④</td><td>⑤</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="branch-footer">
+            <div class="branch-box"><b>• MAIN CAMPUS •</b><br>Pratibimb Academy Campus</div>
+            <div class="branch-box"><b>• HELPLINE •</b><br>Mob. : 9636977490</div>
+        </div>
+
+        <div class="page-num">Page No. : 1</div>
+    </div>
+
+    <!-- QUESTIONS PAGES -->
+    <div id="questions-pages-container"></div>
+</div>
+
+<script>
+    function applyStyles() {
+        const fs = document.getElementById('inp-q-size').value + 'px';
+        document.documentElement.style.setProperty('--q-font-size', fs);
+    }
+
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+    function richText(value) {
+        const input = String(value ?? '').replace(/\r\n?/g, '\n');
+        const doc = new DOMParser().parseFromString('<body>' + input + '</body>', 'text/html');
+        const allowed = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'SUB', 'SUP']);
+        function clean(node) {
+            [...node.childNodes].forEach(child => {
+                if (child.nodeType === Node.ELEMENT_NODE) {
+                    if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'SVG'].includes(child.tagName)) {
+                        child.remove();
+                    } else if (!allowed.has(child.tagName)) {
+                        clean(child);
+                        child.replaceWith(...child.childNodes);
+                    } else {
+                        [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
+                        clean(child);
+                    }
+                } else if (child.nodeType !== Node.TEXT_NODE) {
+                    child.remove();
+                }
+            });
+        }
+        clean(doc.body);
+        return doc.body.innerHTML.replace(/\n/g, '<br>');
+    }
+    function pickLang(value, lang) {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            return value[lang] ?? value.hi ?? value.en ?? '';
+        }
+        return value ?? '';
+    }
+    function getText(q, kind, lang) {
+        const direct = q[`${kind}_${lang}`];
+        if (direct != null) return direct;
+        return pickLang(q[kind], lang);
+    }
+    function renderQuestion(q, number, mode, lang) {
+        const hiQ = getText(q, 'question', 'hi') || (typeof q.question === 'string' ? q.question : '');
+        const enQ = getText(q, 'question', 'en');
+        let title = '';
+        if (lang === 'hi') title = richText(hiQ || enQ);
+        else if (lang === 'en') title = richText(enQ || hiQ);
+        else {
+            title = richText(hiQ || enQ);
+            if (enQ && enQ !== hiQ) title += `<div class="q-en">${richText(enQ)}</div>`;
+        }
+        const optsHi = q.option_hi ?? (q.option && !Array.isArray(q.option) ? q.option.hi : null) ?? q.option ?? [];
+        const optsEn = q.option_en ?? (q.option && !Array.isArray(q.option) ? q.option.en : null) ?? [];
+        const baseOpts = Array.isArray(optsHi) ? optsHi : [];
+        const englishOpts = Array.isArray(optsEn) ? optsEn : [];
+        const opts = (lang === 'en' ? (englishOpts.length ? englishOpts : baseOpts) : baseOpts.length ? baseOpts : englishOpts);
+        let optionsHtml = '';
+        opts.forEach((opt, i) => {
+            let line = richText(opt);
+            if (lang === 'bi' && englishOpts[i] != null && String(englishOpts[i]) !== String(opt)) line += `<div class="q-en">${richText(englishOpts[i])}</div>`;
+            optionsHtml += `<li>[${i + 1}] ${line}</li>`;
+        });
+        let solutionHtml = '';
+        if (mode === 'solution') {
+            const solHi = getText(q, 'solution', 'hi');
+            const solEn = getText(q, 'solution', 'en');
+            let sol = lang === 'hi' ? (solHi || solEn) : lang === 'en' ? (solEn || solHi) : [solHi, solEn && solEn !== solHi ? solEn : ''].filter(Boolean).join('<br>');
+            solutionHtml = `<div class="sol-box"><b>सही उत्तर / Correct Answer: (${esc(q.answer || '')})</b><br>${richText(sol)}</div>`;
+        }
+        return `<div class="q-block"><div class="q-title">${number}. ${title}</div><ul class="q-opts">${optionsHtml}</ul>${solutionHtml}</div>`;
+    }
+    function createQuestionPage(pageNo) {
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'a4-page';
+        pageDiv.innerHTML = `<div class="watermark"><span class="watermark-text">${esc(document.getElementById('inp-wm-text').value)}</span></div>
+            <div class="questions-column-container"><div class="question-col"></div><div class="question-col"></div></div>
+            <div class="page-num">Page No. : ${pageNo}</div>`;
+        document.getElementById('questions-pages-container').appendChild(pageDiv);
+        return {page: pageDiv, cols: pageDiv.querySelectorAll('.question-col'), colIndex: 0};
+    }
+
+    let watermarkImageData = '';
+    function updateWatermarks() {
+        const opacity = Number(document.getElementById('inp-wm-opacity')?.value ?? 12);
+        const size = Number(document.getElementById('inp-wm-size')?.value ?? 70);
+        const angle = Number(document.getElementById('inp-wm-angle')?.value ?? -30);
+        const text = document.getElementById('inp-wm-text')?.value ?? 'Pratibimb Academy';
+        const opacityLabel = document.getElementById('wm-opacity-value');
+        const sizeLabel = document.getElementById('wm-size-value');
+        const angleLabel = document.getElementById('wm-angle-value');
+        if (opacityLabel) opacityLabel.textContent = opacity + '%';
+        if (sizeLabel) sizeLabel.textContent = size + '%';
+        if (angleLabel) angleLabel.textContent = angle + '°';
+
+        document.querySelectorAll('.watermark').forEach(el => {
+            el.style.setProperty('--wm-opacity', opacity / 100);
+            el.style.setProperty('--wm-size', size + '%');
+            el.style.setProperty('--wm-angle', angle + 'deg');
+            if (watermarkImageData) {
+                el.innerHTML = `<img class="watermark-image" src="${watermarkImageData}" alt="Watermark">`;
+            } else {
+                el.innerHTML = `<span class="watermark-text">${esc(text)}</span>`;
+            }
+        });
+    }
+    function loadWatermarkImage(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('कृपया image file चुनें।');
+            event.target.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            watermarkImageData = String(reader.result || '');
+            updateWatermarks();
+        };
+        reader.onerror = () => alert('Photo load नहीं हो पाई। दूसरी image चुनें।');
+        reader.readAsDataURL(file);
+    }
+    function removeWatermarkImage() {
+        watermarkImageData = '';
+        const picker = document.getElementById('inp-wm-image');
+        if (picker) picker.value = '';
+        updateWatermarks();
+    }
+
+    function renderPaper(mode = 'test') {
+        applyStyles();
+        document.getElementById('paper').style.display = 'block';
+        document.getElementById('lbl-title').innerText = document.getElementById('inp-title').value;
+        document.getElementById('lbl-paper-id').innerText = document.getElementById('inp-paper-id').value;
+        document.getElementById('lbl-subject').innerText = document.getElementById('inp-subject').value;
+        document.getElementById('lbl-total-q').innerText = document.getElementById('inp-total-q').value;
+        document.getElementById('lbl-time').innerText = document.getElementById('inp-time').value;
+        document.getElementById('lbl-marks').innerText = document.getElementById('inp-marks').value;
+        updateWatermarks();
+
+        const formatInstructions = (id, target) => {
+            const lines = document.getElementById(id).value.split('\n').filter(x => x.trim());
+            document.getElementById(target).innerHTML = '<ol>' + lines.map(x => `<li>${esc(x.replace(/^[0-9]+\.\s*/, ''))}</li>`).join('') + '</ol>';
+        };
+        formatInstructions('inp-inst-hi', 'lbl-inst-hi');
+        formatInstructions('inp-inst-en', 'lbl-inst-en');
+
+        const qContainer = document.getElementById('questions-pages-container');
+        qContainer.innerHTML = '';
+        let questions = [];
+        try {
+            const parsed = JSON.parse(document.getElementById('inp-json').value);
+            questions = Array.isArray(parsed) ? parsed : (parsed.questions || []);
+            if (!Array.isArray(questions)) throw new Error('Questions must be an array');
+        } catch(e) {
+            alert('JSON Data me error hai! ' + e.message);
+            return;
+        }
+        const lang = document.getElementById('inp-language').value;
+        let state = createQuestionPage(2);
+        questions.forEach((q, index) => {
+            const holder = document.createElement('div');
+            holder.innerHTML = renderQuestion(q, index + 1, mode, lang);
+            const block = holder.firstElementChild;
+            let placed = false;
+            while (!placed) {
+                const col = state.cols[state.colIndex];
+                col.appendChild(block);
+                if (col.scrollHeight <= col.clientHeight + 1 || col.children.length === 1) {
+                    // A single unusually tall question is kept intact rather than causing an endless page loop.
+                    placed = true;
+                } else {
+                    col.removeChild(block);
+                    if (state.colIndex === 0) {
+                        state.colIndex = 1;
+                    } else {
+                        state = createQuestionPage(2 + qContainer.children.length);
+                    }
+                }
+            }
+        });
+        document.getElementById('lbl-pages').innerText = 1 + qContainer.children.length;
+        updateWatermarks();
+    }
+
+    function downloadPDF(mode) {
+        renderPaper(mode);
+        const element = document.getElementById('paper');
+        const fileName = mode === 'test' ? 'RPSC_Test_Paper.pdf' : 'RPSC_Solution_Paper.pdf';
+        
+        const opt = {
+            margin:       0,
+            filename:     fileName,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(element).save();
+    }
+
+    function triggerPrint() {
+        renderPaper('test');
+        window.print();
+    }
+</script>
+
+</body>
+</html>
